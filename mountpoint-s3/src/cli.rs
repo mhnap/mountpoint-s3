@@ -154,7 +154,16 @@ pub struct CliArgs {
         value_parser = value_parser!(u64).range(1..),
         help_heading = CLIENT_OPTIONS_HEADER
     )]
-    pub max_threads: u64,
+    pub max_fuse_threads: u64,
+
+    #[clap(
+        long,
+        help = "Maximum number of Event Loop threads [default: the number of available processors on the machine / 2]",
+        value_name = "N",
+        value_parser = value_parser!(u16).range(1..),
+        help_heading = CLIENT_OPTIONS_HEADER
+    )]
+    pub max_event_loop_threads: Option<u16>,
 
     #[clap(
         long,
@@ -430,7 +439,7 @@ impl CliArgs {
         }
 
         let mount_point = self.mount_point.to_owned();
-        let max_threads = self.max_threads as usize;
+        let max_threads = self.max_fuse_threads as usize;
         FuseSessionConfig {
             mount_point,
             options,
@@ -647,6 +656,9 @@ pub fn create_s3_client(args: &CliArgs) -> anyhow::Result<(S3CrtClient, EventLoo
     }
     if let Some(owner) = &args.expected_bucket_owner {
         client_config = client_config.bucket_owner(owner);
+    }
+    if let Some(max_event_loop_threads) = args.max_event_loop_threads {
+        client_config = client_config.max_event_loop_threads(max_event_loop_threads);
     }
     // Transient errors are really bad for file systems (applications don't usually expect them), so
     // let's be more stubborn than the SDK default. With the CRT defaults of 500ms backoff, full

@@ -94,6 +94,7 @@ pub struct S3ClientConfig {
     max_attempts: Option<NonZeroUsize>,
     read_backpressure: bool,
     initial_read_window: usize,
+    max_event_loop_threads: Option<u16>,
 }
 
 impl Default for S3ClientConfig {
@@ -111,6 +112,7 @@ impl Default for S3ClientConfig {
             max_attempts: None,
             read_backpressure: false,
             initial_read_window: DEFAULT_PART_SIZE,
+            max_event_loop_threads: None,
         }
     }
 }
@@ -205,6 +207,13 @@ impl S3ClientConfig {
         self.initial_read_window = initial_read_window;
         self
     }
+
+    /// Set a maximum number of Event Loop threads.
+    #[must_use = "S3ClientConfig follows a builder pattern"]
+    pub fn max_event_loop_threads(mut self, max_event_loop_threads: u16) -> Self {
+        self.max_event_loop_threads = Some(max_event_loop_threads);
+        self
+    }
 }
 
 /// Authentication configuration for the CRT-based S3 client
@@ -276,7 +285,8 @@ impl S3CrtClientInner {
     fn new(config: S3ClientConfig) -> Result<Self, NewClientError> {
         let allocator = Allocator::default();
 
-        let mut event_loop_group = EventLoopGroup::new_default(&allocator, None, || {}).unwrap();
+        let mut event_loop_group =
+            EventLoopGroup::new_default(&allocator, config.max_event_loop_threads, || {}).unwrap();
 
         let resolver_options = HostResolverDefaultOptions {
             max_entries: 8,
